@@ -227,6 +227,17 @@
   .badge-part { background: #FEF6E4; color: #8A5E00; }
   .badge-wait { background: var(--bg); color: var(--muted); }
 
+  .chip-fixed {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--border) !important;
+    border-style: solid !important;
+    cursor: default !important;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    overflow: hidden;
+  }
+  .chip-fixed:hover { transform: none !important; border-color: var(--border) !important; background: #fff !important; }
+
   input[type="file"] { display: none; }
 
   /* MODAL */
@@ -503,16 +514,34 @@ function resetUser() {
 }
 
 function renderGrid(photos) {
+  const u = users[currentIdx];
   const grid = document.getElementById('photo-grid');
   grid.innerHTML = '';
-  const filled = photos.filter(Boolean).length;
-  const pct = Math.round(filled / 9 * 100);
+  const filled = photos.filter((p, i) => i !== 4 && p).length;
+  const pct = Math.round(filled / 8 * 100);
   document.getElementById('prog-fill').style.width = pct + '%';
   document.getElementById('prog-pct').textContent = pct + '%';
-  document.getElementById('prog-text').textContent = filled + ' / 9장';
+  document.getElementById('prog-text').textContent = filled + ' / 8장';
 
   photos.forEach((ph, i) => {
     const slot = document.createElement('div');
+
+    if (i === 4) {
+      // 가운데: 컬러칩 고정
+      slot.className = 'photo-slot chip-fixed';
+      slot.innerHTML = `
+        <div style="width:100%;height:58%;background:${u.color.hex};position:relative;flex-shrink:0;">
+          <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.5);border:1px solid rgba(0,0,0,0.1);"></div>
+        </div>
+        <div style="padding:5px 7px;flex:1;display:flex;flex-direction:column;justify-content:center;border-top:0.5px solid rgba(0,0,0,0.07);">
+          <div style="font-size:8px;letter-spacing:0.06em;color:#aaa;text-transform:uppercase;margin-bottom:2px;font-family:'DM Mono',monospace;">${u.color.name}</div>
+          <div style="font-size:11px;font-weight:700;color:#1A1814;line-height:1.2;">${u.name}</div>
+        </div>`;
+      slot.style.cursor = 'default';
+      grid.appendChild(slot);
+      return;
+    }
+
     slot.className = 'photo-slot' + (ph ? ' filled' : '');
     if (ph) {
       const img = document.createElement('img'); img.src = ph; img.alt = '';
@@ -522,7 +551,8 @@ function renderGrid(photos) {
       del.onclick = e => { e.stopPropagation(); deletePhoto(i); };
       slot.appendChild(del);
     } else {
-      slot.innerHTML = `<span class="slot-num">0${i+1}</span><span class="slot-hint">탭해서 추가</span>`;
+      const num = i < 4 ? i + 1 : i; // 5번 슬롯 건너뜀
+      slot.innerHTML = `<span class="slot-num">0${num}</span><span class="slot-hint">탭해서 추가</span>`;
     }
     slot.onclick = () => { activeSlot = i; document.getElementById('file-input').click(); };
     grid.appendChild(slot);
@@ -555,7 +585,7 @@ function submitUser() {
   const data = loadData();
   const name = users[currentIdx].name;
   const ud = data[name] || { photos: Array(9).fill(null), submitted: false };
-  if (!ud.photos.filter(Boolean).length) { alert('사진을 최소 1장 업로드한 뒤 제출해주세요.'); return; }
+  if (!ud.photos.filter((p, i) => i !== 4 && p).length) { alert('사진을 최소 1장 업로드한 뒤 제출해주세요.'); return; }
   ud.submitted = true;
   data[name] = ud;
   saveData(data);
@@ -577,7 +607,7 @@ function renderGallery() {
 
   const list = users.filter(u => {
     const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
-    const cnt = ud.photos.filter(Boolean).length;
+    const cnt = ud.photos.filter((p, i) => i !== 4 && p).length;
     if (gFilter === 'done') return ud.submitted;
     if (gFilter === 'partial') return cnt > 0 && !ud.submitted;
     if (gFilter === 'empty') return cnt === 0;
@@ -593,18 +623,22 @@ function renderGallery() {
 
   list.forEach(u => {
     const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
-    const cnt = ud.photos.filter(Boolean).length;
+    const cnt = ud.photos.filter((p, i) => i !== 4 && p).length;
     const card = document.createElement('div'); card.className = 'g-card';
     const top = document.createElement('div'); top.className = 'g-card-top';
-    top.innerHTML = `<div class="g-dot" style="background:${u.color.hex}"></div><span class="g-name">${u.name}</span><span class="g-cnt">${cnt}/9</span>`;
+    top.innerHTML = `<div class="g-dot" style="background:${u.color.hex}"></div><span class="g-name">${u.name}</span><span class="g-cnt">${cnt}/8</span>`;
     card.appendChild(top);
     const mini = document.createElement('div'); mini.className = 'g-mini';
-    ud.photos.forEach(ph => {
+    ud.photos.forEach((ph, i) => {
       const cell = document.createElement('div'); cell.className = 'g-cell';
-      const bg = document.createElement('div'); bg.className = 'g-cell-bg';
-      bg.style.background = u.color.hex + '33';
-      cell.appendChild(bg);
-      if (ph) { const img = document.createElement('img'); img.src = ph; img.alt=''; cell.appendChild(img); }
+      if (i === 4) {
+        cell.style.cssText = `background:${u.color.hex};border-radius:3px;`;
+      } else {
+        const bg = document.createElement('div'); bg.className = 'g-cell-bg';
+        bg.style.background = u.color.hex + '33';
+        cell.appendChild(bg);
+        if (ph) { const img = document.createElement('img'); img.src = ph; img.alt=''; cell.appendChild(img); }
+      }
       mini.appendChild(cell);
     });
     card.appendChild(mini);
@@ -685,8 +719,8 @@ document.addEventListener('keydown', e => {
 function renderAdmin() {
   const data = loadData();
   const done = users.filter(u => (data[u.name]||{}).submitted).length;
-  const partial = users.filter(u => { const d=data[u.name]||{}; return (d.photos||[]).filter(Boolean).length>0 && !d.submitted; }).length;
-  const empty = users.filter(u => !((data[u.name]||{}).photos||[]).filter(Boolean).length).length;
+  const partial = users.filter(u => { const d=data[u.name]||{}; return (d.photos||[]).filter((p,i)=>i!==4&&p).length>0 && !d.submitted; }).length;
+  const empty = users.filter(u => !((data[u.name]||{}).photos||[]).filter((p,i)=>i!==4&&p).length).length;
 
   document.getElementById('admin-stats').innerHTML = `
     <div class="stat"><div class="stat-n">${done}</div><div class="stat-l">제출 완료</div></div>
@@ -697,11 +731,11 @@ function renderAdmin() {
   list.innerHTML = '';
   users.forEach(u => {
     const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
-    const cnt = ud.photos.filter(Boolean).length;
+    const cnt = ud.photos.filter((p,i) => i!==4 && p).length;
     const badge = ud.submitted
       ? `<span class="badge badge-done">완료</span>`
       : cnt > 0
-        ? `<span class="badge badge-part">${cnt}/9</span>`
+        ? `<span class="badge badge-part">${cnt}/8</span>`
         : `<span class="badge badge-wait">대기</span>`;
     const row = document.createElement('div'); row.className = 'admin-row';
     row.innerHTML = `<div class="a-dot" style="background:${u.color.hex}"></div><span class="a-name">${u.name}</span><span class="a-color">${u.color.name}</span>${badge}`;
