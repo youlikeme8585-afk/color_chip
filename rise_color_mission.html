@@ -652,6 +652,68 @@ function renderGallery() {
 let viewerPhotos = [];
 let viewerIdx = 0;
 
+function makeChipDataUrl(u) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 320; canvas.height = 420;
+  const ctx = canvas.getContext('2d');
+  // 흰 배경
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, 0, 0, 320, 420, 16);
+  ctx.fill();
+  // 색 블록
+  ctx.fillStyle = u.color.hex;
+  roundRect(ctx, 0, 0, 320, 260, 16);
+  ctx.fill();
+  // 하단 흰 영역 덮기 (아래 모서리만 둥글게)
+  ctx.fillStyle = u.color.hex;
+  ctx.fillRect(0, 244, 320, 20);
+  // 구멍
+  ctx.beginPath();
+  ctx.arc(160, 28, 12, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // 구분선
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, 264); ctx.lineTo(320, 264); ctx.stroke();
+  // 컬러명
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = '500 22px "DM Mono", monospace';
+  ctx.letterSpacing = '3px';
+  ctx.fillText(u.color.name.toUpperCase(), 24, 304);
+  // 이름
+  ctx.fillStyle = '#1A1814';
+  ctx.font = '700 42px "Noto Sans KR", sans-serif';
+  ctx.letterSpacing = '0px';
+  ctx.fillText(u.name, 24, 360);
+  // 구분선
+  ctx.strokeStyle = '#D4D0C8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(24, 376); ctx.lineTo(72, 376); ctx.stroke();
+  // HEX
+  ctx.fillStyle = '#C4C0B8';
+  ctx.font = '400 20px "DM Mono", monospace';
+  ctx.fillText(u.color.hex.toUpperCase(), 24, 404);
+  return canvas.toDataURL('image/png');
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
 function openModal(u) {
   const data = loadData();
   const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
@@ -661,10 +723,23 @@ function openModal(u) {
 
   const mgrid = document.getElementById('modal-grid');
   mgrid.innerHTML = '';
-  viewerPhotos = ud.photos.filter(Boolean);
 
-  ud.photos.forEach((ph, i) => {
-    if (ph) {
+  const chipUrl = makeChipDataUrl(u);
+
+  // viewerPhotos: 9칸 순서대로, 가운데는 칩 이미지
+  viewerPhotos = ud.photos.map((ph, i) => i === 4 ? chipUrl : ph).filter(Boolean);
+  // 가운데가 항상 있으므로 인덱스 맞춤
+  const allSlots = ud.photos.map((ph, i) => i === 4 ? chipUrl : ph);
+
+  allSlots.forEach((ph, i) => {
+    if (i === 4) {
+      // 칩 슬롯
+      const cell = document.createElement('div'); cell.className = 'modal-cell';
+      const img = document.createElement('img'); img.src = chipUrl; img.alt = '컬러칩';
+      cell.appendChild(img);
+      cell.onclick = () => openViewer(viewerPhotos.indexOf(chipUrl));
+      mgrid.appendChild(cell);
+    } else if (ph) {
       const cell = document.createElement('div'); cell.className = 'modal-cell';
       const img = document.createElement('img'); img.src = ph; img.alt = '';
       cell.appendChild(img);
@@ -673,7 +748,8 @@ function openModal(u) {
       mgrid.appendChild(cell);
     } else {
       const empty = document.createElement('div'); empty.className = 'modal-empty-slot';
-      empty.innerHTML = `<span class="modal-slot-num">0${i+1}</span>`;
+      const num = i < 4 ? i + 1 : i;
+      empty.innerHTML = `<span class="modal-slot-num">0${num}</span>`;
       mgrid.appendChild(empty);
     }
   });
