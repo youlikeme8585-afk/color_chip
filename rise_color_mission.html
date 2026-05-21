@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>컬러 포토 미션 — RISE 워크숍 2탄</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --border: #E2DDD6;
+    --text: #1A1814;
+    --muted: #8A857D;
+    --accent: #1A1814;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--text);
+    color: var(--bg);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-title { font-size: 15px; font-weight: 500; letter-spacing: 0.04em; }
+  .header-sub { font-family: 'DM Mono', monospace; font-size: 11px; opacity: 0.5; margin-top: 2px; }
+
+  /* TABS */
+  .tab-wrap {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    padding: 0 24px;
+  }
+  .tab {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 14px 0;
+    margin-right: 28px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    background: none;
+    border-top: none; border-left: none; border-right: none;
+    letter-spacing: 0.02em;
+    transition: color 0.15s;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--text); }
+
+  .page { display: none; padding: 24px; max-width: 640px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* NAME STEP */
+  .name-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    margin-bottom: 16px;
+  }
+  .name-card h2 { font-size: 17px; font-weight: 500; margin-bottom: 6px; }
+  .name-card p { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+  .input-row { display: flex; gap: 8px; }
+  .input-row input {
+    flex: 1; padding: 10px 14px; font-size: 14px; font-family: 'Noto Sans KR', sans-serif;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--bg); color: var(--text); outline: none;
+    transition: border-color 0.15s;
+  }
+  .input-row input:focus { border-color: var(--text); }
+  .btn {
+    padding: 10px 20px; font-size: 13px; font-weight: 500; font-family: 'Noto Sans KR', sans-serif;
+    background: var(--text); color: var(--bg);
+    border: none; border-radius: var(--radius-sm); cursor: pointer;
+    letter-spacing: 0.02em; transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { opacity: 0.82; }
+  .btn-outline {
+    background: none; color: var(--text); border: 1px solid var(--border);
+  }
+  .btn-outline:hover { border-color: var(--text); opacity: 1; }
+  .error-msg { font-size: 12px; color: #C0392B; margin-top: 8px; display: none; }
+
+  /* COLOR BANNER */
+  .color-banner {
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .color-swatch-lg {
+    width: 52px; height: 52px; border-radius: 50%;
+    border: 3px solid rgba(0,0,0,0.1);
+    flex-shrink: 0;
+  }
+  .color-banner-info {}
+  .color-banner-name { font-size: 11px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 3px; }
+  .color-banner-title { font-size: 22px; font-weight: 700; }
+  .color-banner-hint { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  /* PHOTO GRID */
+  .progress-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--muted); margin-bottom: 8px;
+  }
+  .progress-track {
+    height: 3px; background: var(--border); border-radius: 2px; margin-bottom: 18px; overflow: hidden;
+  }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width 0.35s ease; }
+
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .photo-slot {
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    border: 1.5px dashed var(--border);
+    background: var(--surface);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    cursor: pointer; position: relative; overflow: hidden;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .photo-slot:hover { border-color: var(--muted); background: var(--bg); }
+  .photo-slot.filled { border-style: solid; border-color: var(--border); }
+  .photo-slot.filled img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  }
+  .slot-num {
+    font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500;
+    color: var(--border); line-height: 1;
+  }
+  .slot-hint { font-size: 10px; color: var(--muted); margin-top: 5px; letter-spacing: 0.04em; }
+  .del-btn {
+    position: absolute; top: 5px; right: 5px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.55); color: #fff;
+    border: none; font-size: 13px; line-height: 20px; text-align: center;
+    cursor: pointer; display: none; padding: 0; z-index: 3;
+  }
+  .photo-slot.filled:hover .del-btn { display: block; }
+
+  .submit-area { display: flex; gap: 8px; align-items: center; }
+  .submit-btn { flex: 1; padding: 13px; font-size: 14px; font-weight: 500; border-radius: var(--radius-sm); }
+  .done-banner {
+    display: none; background: #EAF7F0; border: 1px solid #A8DFCA;
+    border-radius: var(--radius-sm); padding: 12px 16px;
+    font-size: 13px; color: #1A6647; margin-top: 10px; text-align: center;
+  }
+
+  /* GALLERY */
+  .gallery-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .gallery-header h2 { font-size: 16px; font-weight: 500; }
+  .gallery-count { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+
+  .filter-pills { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+  .pill {
+    padding: 5px 13px; font-size: 12px; font-weight: 500; letter-spacing: 0.02em;
+    border-radius: 99px; border: 1px solid var(--border);
+    background: none; color: var(--muted); cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif; transition: all 0.15s;
+  }
+  .pill.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+  .g-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .g-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .g-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .g-card-top {
+    padding: 9px 11px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .g-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.1); }
+  .g-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .g-cnt { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); }
+  .g-mini { display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; padding: 6px; }
+  .g-cell { aspect-ratio: 1; border-radius: 4px; overflow: hidden; position: relative; }
+  .g-cell-bg { width: 100%; height: 100%; }
+  .g-cell img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+  /* empty */
+  .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 14px; }
+
+  /* ADMIN */
+  .admin-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 22px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+  .stat-n { font-size: 28px; font-weight: 700; font-family: 'DM Mono', monospace; }
+  .stat-l { font-size: 11px; color: var(--muted); margin-top: 3px; letter-spacing: 0.04em; }
+
+  .admin-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .admin-row .a-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.1); }
+  .admin-row .a-name { font-weight: 500; flex: 1; }
+  .admin-row .a-color { color: var(--muted); font-size: 12px; }
+  .badge {
+    font-size: 10px; padding: 3px 9px; border-radius: 99px; font-weight: 500; letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .badge-done { background: #EAF7F0; color: #1A6647; }
+  .badge-part { background: #FEF6E4; color: #8A5E00; }
+  .badge-wait { background: var(--bg); color: var(--muted); }
+
+  .chip-fixed {
+    display: flex; flex-direction: column;
+    border: 1px solid var(--border) !important;
+    border-style: solid !important;
+    cursor: default !important;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    overflow: hidden;
+  }
+  .chip-fixed:hover { transform: none !important; border-color: var(--border) !important; background: #fff !important; }
+
+  input[type="file"] { display: none; }
+
+  /* MODAL */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(20,18,14,0.72); backdrop-filter: blur(4px);
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius);
+    width: 100%; max-width: 520px; max-height: 90vh;
+    overflow-y: auto; position: relative;
+    animation: modalIn 0.2s ease;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .modal-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--surface); z-index: 1;
+  }
+  .modal-color-dot {
+    width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.1);
+  }
+  .modal-name { font-size: 16px; font-weight: 700; flex: 1; }
+  .modal-color-label { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .modal-close {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--bg); border: 1px solid var(--border);
+    font-size: 16px; line-height: 28px; text-align: center;
+    cursor: pointer; color: var(--muted); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover { color: var(--text); border-color: var(--text); }
+  .modal-grid {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    gap: 4px; padding: 14px;
+  }
+  .modal-cell {
+    aspect-ratio: 1; border-radius: 8px; overflow: hidden; position: relative;
+    cursor: pointer;
+  }
+  .modal-cell-bg { width: 100%; height: 100%; }
+  .modal-cell img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+  .modal-cell:hover img { transform: scale(1.04); }
+  .modal-empty-slot {
+    aspect-ratio: 1; border-radius: 8px;
+    background: var(--bg); border: 1px dashed var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-slot-num { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--border); }
+
+  /* 사진 전체화면 뷰어 */
+  .photo-viewer {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.92);
+    align-items: center; justify-content: center;
+  }
+  .photo-viewer.open { display: flex; }
+  .photo-viewer img { max-width: 92vw; max-height: 88vh; border-radius: 6px; object-fit: contain; }
+  .viewer-close {
+    position: absolute; top: 16px; right: 16px;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.15); color: #fff;
+    border: none; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .viewer-prev, .viewer-next {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.15); color: #fff;
+    border: none; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .viewer-prev { left: 16px; }
+  .viewer-next { right: 16px; }
+  .viewer-counter {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+    font-family: 'DM Mono', monospace; font-size: 12px; color: rgba(255,255,255,0.6);
+  }
+
+  @media (max-width: 480px) {
+    .page { padding: 16px; }
+    .g-grid { grid-template-columns: repeat(2, 1fr); }
+    .admin-stats { grid-template-columns: repeat(3,1fr); }
+    .stat-n { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 상세 모달 -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="closeModal(event)">
+  <div class="modal" id="modal-box">
+    <div class="modal-header">
+      <div class="modal-color-dot" id="modal-dot"></div>
+      <span class="modal-name" id="modal-name"></span>
+      <span class="modal-color-label" id="modal-color-label"></span>
+      <button class="modal-close" onclick="closeModalDirect()">×</button>
+    </div>
+    <div class="modal-grid" id="modal-grid"></div>
+  </div>
+</div>
+
+<!-- 사진 뷰어 -->
+<div class="photo-viewer" id="photo-viewer" onclick="closeViewer()">
+  <button class="viewer-close" onclick="closeViewer()">×</button>
+  <button class="viewer-prev" onclick="viewerNav(-1, event)">‹</button>
+  <img id="viewer-img" src="" alt="" onclick="event.stopPropagation()" />
+  <button class="viewer-next" onclick="viewerNav(1, event)">›</button>
+  <div class="viewer-counter" id="viewer-counter"></div>
+</div>
+
+<div class="header">
+  <div>
+    <div class="header-title">컬러 포토 미션</div>
+    <div class="header-sub">RISE WORKSHOP 2 · 28P</div>
+  </div>
+</div>
+
+<div class="tab-wrap">
+  <button class="tab active" onclick="goTab('mission')">내 미션</button>
+  <button class="tab" onclick="goTab('gallery')">전체 갤러리</button>
+  <button class="tab" onclick="goTab('admin')">현황</button>
+</div>
+
+<!-- 내 미션 -->
+<div class="page active" id="page-mission">
+  <div id="step-name">
+    <div class="name-card">
+      <h2>내 컬러 확인하기</h2>
+      <p>이름을 입력하면 배정된 컬러와 9개 사진 슬롯을 볼 수 있어요.<br>자유 시간에 해당 색깔을 담은 사진을 찍어오세요!</p>
+      <div class="input-row">
+        <input type="text" id="name-input" placeholder="이름 입력" onkeydown="if(event.key==='Enter')loadUser()" autocomplete="off" />
+        <button class="btn" onclick="loadUser()">확인</button>
+      </div>
+      <div class="error-msg" id="name-err">이름을 찾을 수 없어요. 다시 확인해주세요.</div>
+    </div>
+  </div>
+
+  <div id="step-upload" style="display:none;">
+    <div class="color-banner" id="color-banner">
+      <div class="color-swatch-lg" id="banner-dot"></div>
+      <div class="color-banner-info">
+        <div class="color-banner-name" id="banner-name-label">배정 컬러</div>
+        <div class="color-banner-title" id="banner-color-title"></div>
+        <div class="color-banner-hint" id="banner-person"></div>
+      </div>
+    </div>
+
+    <div class="progress-row">
+      <span id="prog-text">0 / 9장</span>
+      <span id="prog-pct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+    </div>
+
+    <div class="photo-grid" id="photo-grid"></div>
+    <input type="file" accept="image/*" id="file-input" />
+
+    <div class="submit-area">
+      <button class="btn submit-btn" onclick="submitUser()">제출하기</button>
+      <button class="btn btn-outline" onclick="resetUser()" style="padding:13px 16px; white-space:nowrap;">← 나가기</button>
+    </div>
+    <div class="done-banner" id="done-banner">✓ 제출 완료! 갤러리 탭에서 모두의 사진을 확인할 수 있어요.</div>
+  </div>
+</div>
+
+<!-- 전체 갤러리 -->
+<div class="page" id="page-gallery">
+  <div class="gallery-header">
+    <h2>전체 갤러리</h2>
+    <span class="gallery-count" id="gallery-count">28명</span>
+  </div>
+  <div class="filter-pills">
+    <button class="pill active" onclick="setFilter('all',this)">전체</button>
+    <button class="pill" onclick="setFilter('done',this)">제출 완료</button>
+    <button class="pill" onclick="setFilter('partial',this)">진행 중</button>
+    <button class="pill" onclick="setFilter('empty',this)">미시작</button>
+  </div>
+  <div class="g-grid" id="g-grid"></div>
+</div>
+
+<!-- 현황 -->
+<div class="page" id="page-admin">
+  <div class="admin-stats" id="admin-stats"></div>
+  <div id="admin-list"></div>
+</div>
+
+<script>
+const COLORS = [
+  {name:'빨강',   hex:'#E24B4A'},{name:'주황',   hex:'#EF9F27'},{name:'노랑',   hex:'#F0D230'},
+  {name:'연두',   hex:'#97C459'},{name:'초록',   hex:'#1D9E75'},{name:'민트',   hex:'#5DCAA5'},
+  {name:'하늘',   hex:'#85B7EB'},{name:'파랑',   hex:'#185FA5'},{name:'남색',   hex:'#3C3489'},
+  {name:'보라',   hex:'#7F77DD'},{name:'자주',   hex:'#9B1D6A'},{name:'분홍',   hex:'#ED93B1'},
+  {name:'자홍',   hex:'#D4537E'},{name:'코랄',   hex:'#D85A30'},{name:'살구',   hex:'#F0997B'},
+  {name:'황금',   hex:'#D4A017'},{name:'베이지', hex:'#E8D5B0'},{name:'올리브', hex:'#639922'},
+  {name:'진분홍', hex:'#D81B60'},{name:'인디고', hex:'#534AB7'},{name:'장미',   hex:'#C0395A'},
+  {name:'석류',   hex:'#C1272D'},{name:'해바라기',hex:'#E8B400'},{name:'이끼',   hex:'#6B8C3A'},
+  {name:'라벤더꽃',hex:'#8B5CF6'},{name:'황토',   hex:'#C2773A'},{name:'새싹',   hex:'#7CB518'},
+  {name:'검정',   hex:'#444441'}
+];
+
+const NAMES = [
+  '신종호','이정수','서룡','장금화','우수리','고단비','한용수','박다솜',
+  '최보근','김민석','오승현','김여진','신소원','최준웅','진세령','조유란',
+  '임한결','정효정','유샛별','나우진','박혜연','남상운','김다솜','손장완',
+  '진민주','조아라','윤슬우','이항'
+];
+
+const STORAGE_KEY = 'rise_w2_photos';
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+}
+function saveData(data) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) { alert('저장 공간이 부족해요. 일부 사진을 삭제해주세요.'); }
+}
+
+const users = NAMES.map((name, i) => ({ name, color: COLORS[i] }));
+
+let currentIdx = null;
+let activeSlot = null;
+let gFilter = 'all';
+
+// ── TABS ──────────────────────────────────
+function goTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['mission','gallery','admin'][i] === tab));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  if (tab === 'gallery') renderGallery();
+  if (tab === 'admin') renderAdmin();
+}
+
+// ── MISSION ───────────────────────────────
+function loadUser() {
+  const val = document.getElementById('name-input').value.trim();
+  const idx = users.findIndex(u => u.name === val);
+  if (idx === -1) { document.getElementById('name-err').style.display = 'block'; return; }
+  document.getElementById('name-err').style.display = 'none';
+  currentIdx = idx;
+  const u = users[idx];
+  const data = loadData();
+  const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
+
+  document.getElementById('step-name').style.display = 'none';
+  document.getElementById('step-upload').style.display = 'block';
+
+  const lightHex = u.color.hex + '22';
+  document.getElementById('color-banner').style.background = lightHex;
+  document.getElementById('banner-dot').style.background = u.color.hex;
+  document.getElementById('banner-color-title').textContent = u.color.name;
+  document.getElementById('banner-person').textContent = u.name + ' 님의 컬러';
+  document.getElementById('prog-fill').style.background = u.color.hex;
+
+  if (ud.submitted) {
+    document.getElementById('done-banner').style.display = 'block';
+  }
+  renderGrid(ud.photos);
+}
+
+function resetUser() {
+  currentIdx = null;
+  document.getElementById('name-input').value = '';
+  document.getElementById('step-name').style.display = 'block';
+  document.getElementById('step-upload').style.display = 'none';
+  document.getElementById('done-banner').style.display = 'none';
+}
+
+function renderGrid(photos) {
+  const u = users[currentIdx];
+  const grid = document.getElementById('photo-grid');
+  grid.innerHTML = '';
+  const filled = photos.filter((p, i) => i !== 4 && p).length;
+  const pct = Math.round(filled / 8 * 100);
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-pct').textContent = pct + '%';
+  document.getElementById('prog-text').textContent = filled + ' / 8장';
+
+  photos.forEach((ph, i) => {
+    const slot = document.createElement('div');
+
+    if (i === 4) {
+      // 가운데: 컬러칩 고정
+      slot.className = 'photo-slot chip-fixed';
+      slot.innerHTML = `
+        <div style="width:100%;height:58%;background:${u.color.hex};position:relative;flex-shrink:0;">
+          <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.5);border:1px solid rgba(0,0,0,0.1);"></div>
+        </div>
+        <div style="padding:5px 7px;flex:1;display:flex;flex-direction:column;justify-content:center;border-top:0.5px solid rgba(0,0,0,0.07);">
+          <div style="font-size:8px;letter-spacing:0.06em;color:#aaa;text-transform:uppercase;margin-bottom:2px;font-family:'DM Mono',monospace;">${u.color.name}</div>
+          <div style="font-size:11px;font-weight:700;color:#1A1814;line-height:1.2;">${u.name}</div>
+        </div>`;
+      slot.style.cursor = 'default';
+      grid.appendChild(slot);
+      return;
+    }
+
+    slot.className = 'photo-slot' + (ph ? ' filled' : '');
+    if (ph) {
+      const img = document.createElement('img'); img.src = ph; img.alt = '';
+      slot.appendChild(img);
+      const del = document.createElement('button');
+      del.className = 'del-btn'; del.textContent = '×';
+      del.onclick = e => { e.stopPropagation(); deletePhoto(i); };
+      slot.appendChild(del);
+    } else {
+      const num = i < 4 ? i + 1 : i; // 5번 슬롯 건너뜀
+      slot.innerHTML = `<span class="slot-num">0${num}</span><span class="slot-hint">탭해서 추가</span>`;
+    }
+    slot.onclick = () => { activeSlot = i; document.getElementById('file-input').click(); };
+    grid.appendChild(slot);
+  });
+}
+
+function compressImage(dataUrl, callback) {
+  const img = new Image();
+  img.onload = () => {
+    const MAX = 800;
+    let w = img.width, h = img.height;
+    if (w > MAX || h > MAX) {
+      if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+      else { w = Math.round(w * MAX / h); h = MAX; }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    callback(canvas.toDataURL('image/jpeg', 0.72));
+  };
+  img.src = dataUrl;
+}
+
+document.getElementById('file-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file || activeSlot === null || currentIdx === null) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    compressImage(ev.target.result, compressed => {
+      const data = loadData();
+      const name = users[currentIdx].name;
+      if (!data[name]) data[name] = { photos: Array(9).fill(null), submitted: false };
+      data[name].photos[activeSlot] = compressed;
+      saveData(data);
+      renderGrid(data[name].photos);
+    });
+  };
+  reader.readAsDataURL(file);
+  this.value = '';
+});
+
+function deletePhoto(i) {
+  const data = loadData();
+  const name = users[currentIdx].name;
+  if (data[name]) { data[name].photos[i] = null; saveData(data); renderGrid(data[name].photos); }
+}
+
+function submitUser() {
+  const data = loadData();
+  const name = users[currentIdx].name;
+  const ud = data[name] || { photos: Array(9).fill(null), submitted: false };
+  if (!ud.photos.filter((p, i) => i !== 4 && p).length) { alert('사진을 최소 1장 업로드한 뒤 제출해주세요.'); return; }
+  ud.submitted = true;
+  data[name] = ud;
+  saveData(data);
+  document.getElementById('done-banner').style.display = 'block';
+}
+
+// ── GALLERY ───────────────────────────────
+function setFilter(f, btn) {
+  gFilter = f;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderGallery();
+}
+
+function renderGallery() {
+  const data = loadData();
+  const grid = document.getElementById('g-grid');
+  grid.innerHTML = '';
+
+  const list = users.filter(u => {
+    const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
+    const cnt = ud.photos.filter((p, i) => i !== 4 && p).length;
+    if (gFilter === 'done') return ud.submitted;
+    if (gFilter === 'partial') return cnt > 0 && !ud.submitted;
+    if (gFilter === 'empty') return cnt === 0;
+    return true;
+  });
+
+  document.getElementById('gallery-count').textContent = list.length + '명';
+
+  if (!list.length) {
+    grid.innerHTML = '<div class="empty">해당하는 참가자가 없어요.</div>';
+    return;
+  }
+
+  list.forEach(u => {
+    const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
+    const cnt = ud.photos.filter((p, i) => i !== 4 && p).length;
+    const card = document.createElement('div'); card.className = 'g-card';
+    const top = document.createElement('div'); top.className = 'g-card-top';
+    top.innerHTML = `<div class="g-dot" style="background:${u.color.hex}"></div><span class="g-name">${u.name}</span><span class="g-cnt">${cnt}/8</span>`;
+    card.appendChild(top);
+    const mini = document.createElement('div'); mini.className = 'g-mini';
+    ud.photos.forEach((ph, i) => {
+      const cell = document.createElement('div'); cell.className = 'g-cell';
+      if (i === 4) {
+        cell.style.cssText = `background:${u.color.hex};border-radius:3px;`;
+      } else {
+        const bg = document.createElement('div'); bg.className = 'g-cell-bg';
+        bg.style.background = u.color.hex + '33';
+        cell.appendChild(bg);
+        if (ph) { const img = document.createElement('img'); img.src = ph; img.alt=''; cell.appendChild(img); }
+      }
+      mini.appendChild(cell);
+    });
+    card.appendChild(mini);
+    card.style.cursor = 'pointer';
+    card.onclick = () => openModal(u);
+    grid.appendChild(card);
+  });
+}
+
+// ── MODAL ─────────────────────────────────
+let viewerPhotos = [];
+let viewerIdx = 0;
+
+function makeChipDataUrl(u) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 320; canvas.height = 420;
+  const ctx = canvas.getContext('2d');
+  // 흰 배경
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, 0, 0, 320, 420, 16);
+  ctx.fill();
+  // 색 블록
+  ctx.fillStyle = u.color.hex;
+  roundRect(ctx, 0, 0, 320, 260, 16);
+  ctx.fill();
+  // 하단 흰 영역 덮기 (아래 모서리만 둥글게)
+  ctx.fillStyle = u.color.hex;
+  ctx.fillRect(0, 244, 320, 20);
+  // 구멍
+  ctx.beginPath();
+  ctx.arc(160, 28, 12, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // 구분선
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, 264); ctx.lineTo(320, 264); ctx.stroke();
+  // 컬러명
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = '500 22px "DM Mono", monospace';
+  ctx.letterSpacing = '3px';
+  ctx.fillText(u.color.name.toUpperCase(), 24, 304);
+  // 이름
+  ctx.fillStyle = '#1A1814';
+  ctx.font = '700 42px "Noto Sans KR", sans-serif';
+  ctx.letterSpacing = '0px';
+  ctx.fillText(u.name, 24, 360);
+  // 구분선
+  ctx.strokeStyle = '#D4D0C8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(24, 376); ctx.lineTo(72, 376); ctx.stroke();
+  // HEX
+  ctx.fillStyle = '#C4C0B8';
+  ctx.font = '400 20px "DM Mono", monospace';
+  ctx.fillText(u.color.hex.toUpperCase(), 24, 404);
+  return canvas.toDataURL('image/png');
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function openModal(u) {
+  const data = loadData();
+  const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
+  document.getElementById('modal-dot').style.background = u.color.hex;
+  document.getElementById('modal-name').textContent = u.name;
+  document.getElementById('modal-color-label').textContent = u.color.name;
+
+  const mgrid = document.getElementById('modal-grid');
+  mgrid.innerHTML = '';
+
+  const chipUrl = makeChipDataUrl(u);
+
+  // viewerPhotos: 9칸 순서대로, 가운데는 칩 이미지
+  viewerPhotos = ud.photos.map((ph, i) => i === 4 ? chipUrl : ph).filter(Boolean);
+  // 가운데가 항상 있으므로 인덱스 맞춤
+  const allSlots = ud.photos.map((ph, i) => i === 4 ? chipUrl : ph);
+
+  allSlots.forEach((ph, i) => {
+    if (i === 4) {
+      // 칩 슬롯
+      const cell = document.createElement('div'); cell.className = 'modal-cell';
+      const img = document.createElement('img'); img.src = chipUrl; img.alt = '컬러칩';
+      cell.appendChild(img);
+      cell.onclick = () => openViewer(viewerPhotos.indexOf(chipUrl));
+      mgrid.appendChild(cell);
+    } else if (ph) {
+      const cell = document.createElement('div'); cell.className = 'modal-cell';
+      const img = document.createElement('img'); img.src = ph; img.alt = '';
+      cell.appendChild(img);
+      const vidx = viewerPhotos.indexOf(ph);
+      cell.onclick = () => openViewer(vidx);
+      mgrid.appendChild(cell);
+    } else {
+      const empty = document.createElement('div'); empty.className = 'modal-empty-slot';
+      const num = i < 4 ? i + 1 : i;
+      empty.innerHTML = `<span class="modal-slot-num">0${num}</span>`;
+      mgrid.appendChild(empty);
+    }
+  });
+
+  document.getElementById('modal-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modal-backdrop')) closeModalDirect();
+}
+function closeModalDirect() {
+  document.getElementById('modal-backdrop').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function openViewer(idx) {
+  viewerIdx = idx;
+  document.getElementById('viewer-img').src = viewerPhotos[viewerIdx];
+  document.getElementById('viewer-counter').textContent = (viewerIdx+1) + ' / ' + viewerPhotos.length;
+  document.getElementById('photo-viewer').classList.add('open');
+}
+function closeViewer() {
+  document.getElementById('photo-viewer').classList.remove('open');
+}
+function viewerNav(dir, e) {
+  e.stopPropagation();
+  viewerIdx = (viewerIdx + dir + viewerPhotos.length) % viewerPhotos.length;
+  document.getElementById('viewer-img').src = viewerPhotos[viewerIdx];
+  document.getElementById('viewer-counter').textContent = (viewerIdx+1) + ' / ' + viewerPhotos.length;
+}
+document.addEventListener('keydown', e => {
+  if (document.getElementById('photo-viewer').classList.contains('open')) {
+    if (e.key === 'ArrowRight') viewerNav(1, { stopPropagation: ()=>{} });
+    if (e.key === 'ArrowLeft')  viewerNav(-1, { stopPropagation: ()=>{} });
+    if (e.key === 'Escape') closeViewer();
+  } else if (document.getElementById('modal-backdrop').classList.contains('open')) {
+    if (e.key === 'Escape') closeModalDirect();
+  }
+});
+
+// ── ADMIN ─────────────────────────────────
+function renderAdmin() {
+  const data = loadData();
+  const done = users.filter(u => (data[u.name]||{}).submitted).length;
+  const partial = users.filter(u => { const d=data[u.name]||{}; return (d.photos||[]).filter((p,i)=>i!==4&&p).length>0 && !d.submitted; }).length;
+  const empty = users.filter(u => !((data[u.name]||{}).photos||[]).filter((p,i)=>i!==4&&p).length).length;
+
+  document.getElementById('admin-stats').innerHTML = `
+    <div class="stat"><div class="stat-n">${done}</div><div class="stat-l">제출 완료</div></div>
+    <div class="stat"><div class="stat-n">${partial}</div><div class="stat-l">진행 중</div></div>
+    <div class="stat"><div class="stat-n">${empty}</div><div class="stat-l">미시작</div></div>`;
+
+  const list = document.getElementById('admin-list');
+  list.innerHTML = '';
+  users.forEach(u => {
+    const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
+    const cnt = ud.photos.filter((p,i) => i!==4 && p).length;
+    const badge = ud.submitted
+      ? `<span class="badge badge-done">완료</span>`
+      : cnt > 0
+        ? `<span class="badge badge-part">${cnt}/8</span>`
+        : `<span class="badge badge-wait">대기</span>`;
+    const row = document.createElement('div'); row.className = 'admin-row';
+    row.innerHTML = `<div class="a-dot" style="background:${u.color.hex}"></div><span class="a-name">${u.name}</span><span class="a-color">${u.color.name}</span>${badge}`;
+    list.appendChild(row);
+  });
+}
+</script>
+</body>
+</html>
