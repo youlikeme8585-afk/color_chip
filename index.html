@@ -811,6 +811,21 @@ document.addEventListener('keydown', e => {
 });
 
 // ── ADMIN ─────────────────────────────────
+function resetAll() {
+  if (!confirm('전체 참가자의 사진과 제출 데이터를 모두 삭제할까요?\n이 작업은 되돌릴 수 없어요.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  renderAdmin();
+  alert('✓ 전체 초기화 완료!');
+}
+
+function resetOne(name) {
+  if (!confirm(`${name} 님의 데이터를 초기화할까요?`)) return;
+  const data = loadData();
+  delete data[name];
+  saveData(data);
+  renderAdmin();
+}
+
 function renderAdmin() {
   const data = loadData();
   const done = users.filter(u => (data[u.name]||{}).submitted).length;
@@ -824,6 +839,13 @@ function renderAdmin() {
 
   const list = document.getElementById('admin-list');
   list.innerHTML = '';
+
+  // 전체 초기화 버튼
+  const resetBar = document.createElement('div');
+  resetBar.style.cssText = 'display:flex; justify-content:flex-end; margin-bottom:14px;';
+  resetBar.innerHTML = `<button onclick="resetAll()" style="padding:8px 16px; font-size:12px; font-weight:500; font-family:\'Noto Sans KR\',sans-serif; background:#fff; color:#C0392B; border:1px solid #E8A09A; border-radius:8px; cursor:pointer; letter-spacing:0.02em;">전체 초기화</button>`;
+  list.appendChild(resetBar);
+
   users.forEach(u => {
     const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
     const cnt = ud.photos.filter((p,i) => i!==4 && p).length;
@@ -833,7 +855,7 @@ function renderAdmin() {
         ? `<span class="badge badge-part">${cnt}/8</span>`
         : `<span class="badge badge-wait">대기</span>`;
     const row = document.createElement('div'); row.className = 'admin-row';
-    row.innerHTML = `<div class="a-dot" style="background:${u.color.hex}"></div><span class="a-name">${u.name}</span><span class="a-color">${u.color.name}</span>${badge}`;
+    row.innerHTML = `<div class="a-dot" style="background:${u.color.hex}"></div><span class="a-name">${u.name}</span><span class="a-color">${u.color.name}</span>${badge}<button onclick="resetOne('${u.name}')" style="padding:2px 8px; font-size:10px; font-family:\'Noto Sans KR\',sans-serif; background:none; color:#aaa; border:1px solid #e0ddd8; border-radius:6px; cursor:pointer; margin-left:4px;">초기화</button>`;
     list.appendChild(row);
   });
 }
