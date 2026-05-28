@@ -630,18 +630,99 @@ function compressImage(dataUrl, callback) {
   img.src = dataUrl;
 }
 
-document.getElementById('file-input').addEventListener('change', function(e) {
+async function uploadToStorage(name, slot, dataUrl) {
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const path = `photos/${name}/${slot}.jpg`;
+    const res = await fetch(`${SUPA_URL}/storage/v1/object/rise-photos/${path}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'image/jpeg',
+        'x-upsert': 'true'
+      },
+      body: blob
+    });
+    if (res.ok) return `${SUPA_URL}/storage/v1/object/public/rise-photos/${path}`;
+    return null;
+  } catch(e) { console.error('Storage 업로드 실패', e); return null; }
+}
+
+async function deleteFromStorage(name, slot) {
+  try {
+    await fetch(`${SUPA_URL}/storage/v1/object/rise-photos/photos/${name}/${slot}.jpg`, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` }
+    });
+  } catch(e) {}
+}
+
+async function loadPhotosFromStorage(name) {
+  try {
+    const res = await fetch(`${SUPA_URL}/storage/v1/object/list/rise-photos/photos/${encodeURIComponent(name)}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ limit: 100, offset: 0 })
+    });
+    const files = await res.json();
+    const photos = Array(9).fill(null);
+    if (Array.isArray(files)) {
+      files.forEach(f => {
+        const slot = parseInt(f.name.replace('.jpg',''));
+        if (!isNaN(slot)) photos[slot] = `${SUPA_URL}/storage/v1/object/public/rise-photos/photos/${encodeURIComponent(name)}/${f.name}?t=${Date.now()}`;
+      });
+    }
+    return photos;
+  } catch(e) { return Array(9).fill(null); }
+}
+
+async function loadAllPhotosFromStorage() {
+  try {
+    const res = await fetch(`${SUPA_URL}/storage/v1/object/list/rise-photos/photos`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ limit: 100, offset: 0 })
+    });
+    const folders = await res.json();
+    return Array.isArray(folders) ? folders.map(f => f.name) : [];
+  } catch(e) { return []; }
+}
+
+document.getElementById('file-input').addEventListener('change', async function(e) {
   const file = e.target.files[0];
   if (!file || activeSlot === null || currentIdx === null) return;
+  const name = users[currentIdx].name;
+
+  // 로컬에 먼저 표시
   const reader = new FileReader();
   reader.onload = ev => {
-    compressImage(ev.target.result, compressed => {
+    compressImage(ev.target.result, async compressed => {
+      // 로컬 저장
       const data = loadData();
-      const name = users[currentIdx].name;
       if (!data[name]) data[name] = { photos: Array(9).fill(null), submitted: false };
       data[name].photos[activeSlot] = compressed;
       saveData(data);
       renderGrid(data[name].photos);
+
+      // Supabase Storage 업로드
+      const url = await uploadToStorage(name, activeSlot, compressed);
+      if (url) {
+        // URL로 교체
+        data[name].photos[activeSlot] = url;
+        saveData(data);
+        // 제출 현황 업데이트
+        const cnt = data[name].photos.filter((p, i) => i !== 4 && p).length;
+        supaUpsert(name, data[name].submitted || false, cnt);
+      }
     });
   };
   reader.readAsDataURL(file);
@@ -675,36 +756,43 @@ function setFilter(f, btn) {
   renderGallery();
 }
 
-function renderGallery() {
-  const data = loadData();
+async function renderGallery() {
   const grid = document.getElementById('g-grid');
-  grid.innerHTML = '';
+  grid.innerHTML = '<div class="empty">불러오는 중...</div>';
+
+  const supaData = await supaLoadAll();
+  const supaMap = {};
+  supaData.forEach(r => { supaMap[r.name] = r; });
 
   const list = users.filter(u => {
-    const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
-    const cnt = ud.photos.filter((p, i) => i !== 4 && p).length;
-    if (gFilter === 'done') return ud.submitted;
-    if (gFilter === 'partial') return cnt > 0 && !ud.submitted;
-    if (gFilter === 'empty') return cnt === 0;
+    const r = supaMap[u.name];
+    const cnt = r?.photo_count || 0;
+    if (gFilter === 'done') return r?.submitted;
+    if (gFilter === 'partial') return cnt > 0 && !r?.submitted;
+    if (gFilter === 'empty') return !r || cnt === 0;
     return true;
   });
 
   document.getElementById('gallery-count').textContent = list.length + '명';
+  grid.innerHTML = '';
 
   if (!list.length) {
     grid.innerHTML = '<div class="empty">해당하는 참가자가 없어요.</div>';
     return;
   }
 
-  list.forEach(u => {
-    const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
-    const cnt = ud.photos.filter((p, i) => i !== 4 && p).length;
+  // 각 카드 순서대로 렌더링 (사진은 비동기로 채움)
+  list.forEach(async u => {
+    const r = supaMap[u.name];
+    const cnt = r?.photo_count || 0;
     const card = document.createElement('div'); card.className = 'g-card';
     const top = document.createElement('div'); top.className = 'g-card-top';
     top.innerHTML = `<div class="g-dot" style="background:${u.color.hex}"></div><span class="g-name">${u.name}</span><span class="g-cnt">${cnt}/8</span>`;
     card.appendChild(top);
     const mini = document.createElement('div'); mini.className = 'g-mini';
-    ud.photos.forEach((ph, i) => {
+
+    // 빈 그리드 먼저 그리기
+    const cells = Array(9).fill(null).map((_, i) => {
       const cell = document.createElement('div'); cell.className = 'g-cell';
       if (i === 4) {
         cell.style.cssText = `background:${u.color.hex};border-radius:3px;`;
@@ -712,14 +800,24 @@ function renderGallery() {
         const bg = document.createElement('div'); bg.className = 'g-cell-bg';
         bg.style.background = u.color.hex + '33';
         cell.appendChild(bg);
-        if (ph) { const img = document.createElement('img'); img.src = ph; img.alt=''; cell.appendChild(img); }
       }
       mini.appendChild(cell);
+      return cell;
     });
+
     card.appendChild(mini);
     card.style.cursor = 'pointer';
-    card.onclick = () => openModal(u);
+    card.onclick = () => openModalFromStorage(u);
     grid.appendChild(card);
+
+    // 사진 비동기 로드
+    const photos = await loadPhotosFromStorage(u.name);
+    photos.forEach((ph, i) => {
+      if (ph && i !== 4) {
+        const img = document.createElement('img'); img.src = ph; img.alt = '';
+        cells[i].appendChild(img);
+      }
+    });
   });
 }
 
@@ -789,7 +887,47 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+async function openModalFromStorage(u) {
+  document.getElementById('modal-dot').style.background = u.color.hex;
+  document.getElementById('modal-name').textContent = u.name;
+  document.getElementById('modal-color-label').textContent = u.color.name;
+
+  const mgrid = document.getElementById('modal-grid');
+  mgrid.innerHTML = '<p style="grid-column:1/-1;font-size:13px;color:var(--muted);text-align:center;padding:16px;">불러오는 중...</p>';
+  document.getElementById('modal-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  const photos = await loadPhotosFromStorage(u.name);
+  const chipUrl = makeChipDataUrl(u);
+  viewerPhotos = photos.map((ph, i) => i === 4 ? chipUrl : ph).filter(Boolean);
+
+  mgrid.innerHTML = '';
+  photos.forEach((ph, i) => {
+    if (i === 4) {
+      const cell = document.createElement('div'); cell.className = 'modal-cell';
+      const img = document.createElement('img'); img.src = chipUrl; img.alt = '컬러칩';
+      cell.appendChild(img);
+      cell.onclick = () => openViewer(viewerPhotos.indexOf(chipUrl));
+      mgrid.appendChild(cell);
+    } else if (ph) {
+      const cell = document.createElement('div'); cell.className = 'modal-cell';
+      const img = document.createElement('img'); img.src = ph; img.alt = '';
+      cell.appendChild(img);
+      const vidx = viewerPhotos.indexOf(ph);
+      cell.onclick = () => openViewer(vidx);
+      mgrid.appendChild(cell);
+    } else {
+      const empty = document.createElement('div'); empty.className = 'modal-empty-slot';
+      const num = i < 4 ? i + 1 : i;
+      empty.innerHTML = `<span class="modal-slot-num">0${num}</span>`;
+      mgrid.appendChild(empty);
+    }
+  });
+}
+
 function openModal(u) {
+  openModalFromStorage(u);
+}
   const data = loadData();
   const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
   document.getElementById('modal-dot').style.background = u.color.hex;
