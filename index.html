@@ -616,67 +616,38 @@ function setFilter(f, btn) {
 }
 
 function renderGallery() {
+  const data = loadData();
   const grid = document.getElementById('g-grid');
-  grid.innerHTML = '<div class="empty">불러오는 중...</div>';
-
-  const supaData = await supaLoadAll();
-  const supaMap = {};
-  supaData.forEach(r => { supaMap[r.name] = r; });
-
+  grid.innerHTML = '';
   const list = users.filter(u => {
-    const r = supaMap[u.name];
-    const cnt = r?.photo_count || 0;
-    if (gFilter === 'done') return r?.submitted;
-    if (gFilter === 'partial') return cnt > 0 && !r?.submitted;
-    if (gFilter === 'empty') return !r || cnt === 0;
+    const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
+    const cnt = ud.photos.filter((p, i) => i !== 4 && p).length;
+    if (gFilter === 'done') return ud.submitted;
+    if (gFilter === 'partial') return cnt > 0 && !ud.submitted;
+    if (gFilter === 'empty') return cnt === 0;
     return true;
   });
-
   document.getElementById('gallery-count').textContent = list.length + '명';
-  grid.innerHTML = '';
-
-  if (!list.length) {
-    grid.innerHTML = '<div class="empty">해당하는 참가자가 없어요.</div>';
-    return;
-  }
-
-  // 각 카드 순서대로 렌더링 (사진은 비동기로 채움)
-  list.forEach(async u => {
-    const r = supaMap[u.name];
-    const cnt = r?.photo_count || 0;
+  if (!list.length) { grid.innerHTML = '<div class="empty">해당하는 참가자가 없어요.</div>'; return; }
+  list.forEach(u => {
+    const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
+    const cnt = ud.photos.filter((p, i) => i !== 4 && p).length;
     const card = document.createElement('div'); card.className = 'g-card';
     const top = document.createElement('div'); top.className = 'g-card-top';
     top.innerHTML = `<div class="g-dot" style="background:${u.color.hex}"></div><span class="g-name">${u.name}</span><span class="g-cnt">${cnt}/8</span>`;
     card.appendChild(top);
     const mini = document.createElement('div'); mini.className = 'g-mini';
-
-    // 빈 그리드 먼저 그리기
-    const cells = Array(9).fill(null).map((_, i) => {
+    ud.photos.forEach((ph, i) => {
       const cell = document.createElement('div'); cell.className = 'g-cell';
-      if (i === 4) {
-        cell.style.cssText = `background:${u.color.hex};border-radius:3px;`;
-      } else {
+      if (i === 4) { cell.style.cssText = `background:${u.color.hex};border-radius:3px;`; }
+      else {
         const bg = document.createElement('div'); bg.className = 'g-cell-bg';
-        bg.style.background = u.color.hex + '33';
-        cell.appendChild(bg);
+        bg.style.background = u.color.hex + '33'; cell.appendChild(bg);
+        if (ph) { const img = document.createElement('img'); img.src = ph; img.alt = ''; cell.appendChild(img); }
       }
       mini.appendChild(cell);
-      return cell;
     });
-
-    card.appendChild(mini);
-    card.style.cursor = 'pointer';
-    card.onclick = () => openModalFromStorage(u);
-    grid.appendChild(card);
-
-    // 사진 비동기 로드
-    const photos = await loadPhotosFromStorage(u.name);
-    photos.forEach((ph, i) => {
-      if (ph && i !== 4) {
-        const img = document.createElement('img'); img.src = ph; img.alt = '';
-        cells[i].appendChild(img);
-      }
-    });
+    card.appendChild(mini); card.style.cursor = 'pointer'; card.onclick = () => openModal(u); grid.appendChild(card);
   });
 }
 
@@ -747,6 +718,37 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 
+function openModal(u) {
+  const data = loadData();
+  const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
+  document.getElementById('modal-dot').style.background = u.color.hex;
+  document.getElementById('modal-name').textContent = u.name;
+  document.getElementById('modal-color-label').textContent = u.color.name;
+  const mgrid = document.getElementById('modal-grid'); mgrid.innerHTML = '';
+  const chipUrl = makeChipDataUrl(u);
+  viewerPhotos = ud.photos.map((ph, i) => i === 4 ? chipUrl : ph).filter(Boolean);
+  const allSlots = ud.photos.map((ph, i) => i === 4 ? chipUrl : ph);
+  allSlots.forEach((ph, i) => {
+    if (i === 4) {
+      const cell = document.createElement('div'); cell.className = 'modal-cell';
+      const img = document.createElement('img'); img.src = chipUrl; img.alt = '컬러칩'; cell.appendChild(img);
+      cell.onclick = () => openViewer(viewerPhotos.indexOf(chipUrl)); mgrid.appendChild(cell);
+    } else if (ph) {
+      const cell = document.createElement('div'); cell.className = 'modal-cell';
+      const img = document.createElement('img'); img.src = ph; img.alt = ''; cell.appendChild(img);
+      cell.onclick = () => openViewer(viewerPhotos.indexOf(ph)); mgrid.appendChild(cell);
+    } else {
+      const empty = document.createElement('div'); empty.className = 'modal-empty-slot';
+      const num = i < 4 ? i + 1 : i;
+      empty.innerHTML = `<span class="modal-slot-num">0${num}</span>`; mgrid.appendChild(empty);
+    }
+  });
+  document.getElementById('modal-backdrop').classList.add('open'); document.body.style.overflow = 'hidden';
+}
+
+function loadData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||{}; } catch { return {}; } }
+function saveData(d) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch(e) { alert('저장 공간이 부족해요.'); } }
+
 function closeModal(e) {
   if (e.target === document.getElementById('modal-backdrop')) closeModalDirect();
 }
@@ -797,45 +799,29 @@ function resetOne(name) {
 }
 
 function renderAdmin() {
-  const list = document.getElementById('admin-list');
-  list.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:12px 0;">불러오는 중...</p>';
-
-  const supaData = await supaLoadAll();
-  const supaMap = {};
-  supaData.forEach(r => { supaMap[r.name] = r; });
-
-  const done = users.filter(u => supaMap[u.name]?.submitted).length;
-  const partial = users.filter(u => supaMap[u.name] && !supaMap[u.name].submitted).length;
-  const empty = users.filter(u => !supaMap[u.name]).length;
-
+  const data = loadData();
+  const done = users.filter(u => (data[u.name]||{}).submitted).length;
+  const partial = users.filter(u => { const d=data[u.name]||{}; return (d.photos||[]).filter((p,i)=>i!==4&&p).length>0 && !d.submitted; }).length;
+  const empty = users.filter(u => !((data[u.name]||{}).photos||[]).filter((p,i)=>i!==4&&p).length).length;
   document.getElementById('admin-stats').innerHTML = `
     <div class="stat"><div class="stat-n">${done}</div><div class="stat-l">제출 완료</div></div>
     <div class="stat"><div class="stat-n">${partial}</div><div class="stat-l">진행 중</div></div>
     <div class="stat"><div class="stat-n">${empty}</div><div class="stat-l">미시작</div></div>`;
-
-  list.innerHTML = '';
-
+  const list = document.getElementById('admin-list'); list.innerHTML = '';
   const resetBar = document.createElement('div');
-  resetBar.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;';
-  resetBar.innerHTML = `
-    <button onclick="renderAdmin()" style="padding:8px 14px; font-size:12px; font-weight:500; font-family:'Noto Sans KR',sans-serif; background:#fff; color:var(--text); border:1px solid var(--border); border-radius:8px; cursor:pointer;">새로고침 ↻</button>
-    <button onclick="resetAll()" style="padding:8px 16px; font-size:12px; font-weight:500; font-family:'Noto Sans KR',sans-serif; background:#fff; color:#C0392B; border:1px solid #E8A09A; border-radius:8px; cursor:pointer;">전체 초기화</button>`;
+  resetBar.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:14px;';
+  resetBar.innerHTML = `<button onclick="resetAll()" style="padding:8px 16px;font-size:12px;font-weight:500;font-family:'Noto Sans KR',sans-serif;background:#fff;color:#C0392B;border:1px solid #E8A09A;border-radius:8px;cursor:pointer;">전체 초기화</button>`;
   list.appendChild(resetBar);
-
   users.forEach(u => {
-    const r = supaMap[u.name];
-    const submitted = r?.submitted || false;
-    const cnt = r?.photo_count || 0;
-    const badge = submitted
-      ? `<span class="badge badge-done">완료</span>`
-      : cnt > 0
-        ? `<span class="badge badge-part">${cnt}/8</span>`
-        : `<span class="badge badge-wait">대기</span>`;
+    const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
+    const cnt = ud.photos.filter((p,i) => i!==4 && p).length;
+    const badge = ud.submitted ? `<span class="badge badge-done">완료</span>` : cnt > 0 ? `<span class="badge badge-part">${cnt}/8</span>` : `<span class="badge badge-wait">대기</span>`;
     const row = document.createElement('div'); row.className = 'admin-row';
-    row.innerHTML = `<div class="a-dot" style="background:${u.color.hex}"></div><span class="a-name">${u.name}</span><span class="a-color">${u.color.name}</span>${badge}<button onclick="resetOne('${u.name}')" style="padding:2px 8px; font-size:10px; font-family:'Noto Sans KR',sans-serif; background:none; color:#aaa; border:1px solid #e0ddd8; border-radius:6px; cursor:pointer; margin-left:4px;">초기화</button>`;
+    row.innerHTML = `<div class="a-dot" style="background:${u.color.hex}"></div><span class="a-name">${u.name}</span><span class="a-color">${u.color.name}</span>${badge}<button onclick="resetOne('${u.name}')" style="padding:2px 8px;font-size:10px;font-family:'Noto Sans KR',sans-serif;background:none;color:#aaa;border:1px solid #e0ddd8;border-radius:6px;cursor:pointer;margin-left:4px;">초기화</button>`;
     list.appendChild(row);
   });
 }
+
 </script>
 </body>
 </html>
