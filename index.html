@@ -455,68 +455,6 @@ const NAMES = [
 ];
 
 const STORAGE_KEY = 'rise_w2_photos';
-const SUPA_URL = 'https://zqtxxskhepyxehrtcqjh.supabase.co';
-const SUPA_KEY = 'sb_publishable_ponQ1TpXbRQibWXrcHDRBw_HNS2v7AA';
-
-function loadData() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
-}
-function saveData(data) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) { alert('저장 공간이 부족해요. 일부 사진을 삭제해주세요.'); }
-}
-
-// Supabase: 제출 현황만 저장/조회
-async function supaUpsert(name, submitted, photoCount) {
-  try {
-    await fetch(`${SUPA_URL}/rest/v1/submissions`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${SUPA_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({ name, submitted, photo_count: photoCount })
-    });
-  } catch(e) { console.error('Supabase 저장 실패', e); }
-}
-
-async function supaLoadAll() {
-  try {
-    const res = await fetch(`${SUPA_URL}/rest/v1/submissions?select=*`, {
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${SUPA_KEY}`
-      }
-    });
-    return await res.json();
-  } catch(e) { return []; }
-}
-
-async function supaReset() {
-  try {
-    await fetch(`${SUPA_URL}/rest/v1/submissions?name=neq.null`, {
-      method: 'DELETE',
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${SUPA_KEY}`
-      }
-    });
-  } catch(e) { console.error('Supabase 초기화 실패', e); }
-}
-
-async function supaResetOne(name) {
-  try {
-    await fetch(`${SUPA_URL}/rest/v1/submissions?name=eq.${encodeURIComponent(name)}`, {
-      method: 'DELETE',
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${SUPA_KEY}`
-      }
-    });
-  } catch(e) { console.error('Supabase 개인 초기화 실패', e); }
-}
-
 const users = NAMES.map((name, i) => ({ name, color: COLORS[i] }));
 
 let currentIdx = null;
@@ -630,104 +568,27 @@ function compressImage(dataUrl, callback) {
   img.src = dataUrl;
 }
 
-async function uploadToStorage(name, slot, dataUrl) {
-  try {
-    const blob = await (await fetch(dataUrl)).blob();
-    const path = `photos/${name}/${slot}.jpg`;
-    const res = await fetch(`${SUPA_URL}/storage/v1/object/rise-photos/${path}`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${SUPA_KEY}`,
-        'Content-Type': 'image/jpeg',
-        'x-upsert': 'true'
-      },
-      body: blob
-    });
-    if (res.ok) return `${SUPA_URL}/storage/v1/object/public/rise-photos/${path}`;
-    return null;
-  } catch(e) { console.error('Storage 업로드 실패', e); return null; }
-}
 
-async function deleteFromStorage(name, slot) {
-  try {
-    await fetch(`${SUPA_URL}/storage/v1/object/rise-photos/photos/${name}/${slot}.jpg`, {
-      method: 'DELETE',
-      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` }
-    });
-  } catch(e) {}
-}
 
-async function loadPhotosFromStorage(name) {
-  try {
-    const res = await fetch(`${SUPA_URL}/storage/v1/object/list/rise-photos/photos/${encodeURIComponent(name)}`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${SUPA_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ limit: 100, offset: 0 })
-    });
-    const files = await res.json();
-    const photos = Array(9).fill(null);
-    if (Array.isArray(files)) {
-      files.forEach(f => {
-        const slot = parseInt(f.name.replace('.jpg',''));
-        if (!isNaN(slot)) photos[slot] = `${SUPA_URL}/storage/v1/object/public/rise-photos/photos/${encodeURIComponent(name)}/${f.name}?t=${Date.now()}`;
-      });
-    }
-    return photos;
-  } catch(e) { return Array(9).fill(null); }
-}
 
-async function loadAllPhotosFromStorage() {
-  try {
-    const res = await fetch(`${SUPA_URL}/storage/v1/object/list/rise-photos/photos`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPA_KEY,
-        'Authorization': `Bearer ${SUPA_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ limit: 100, offset: 0 })
-    });
-    const folders = await res.json();
-    return Array.isArray(folders) ? folders.map(f => f.name) : [];
-  } catch(e) { return []; }
-}
 
-document.getElementById('file-input').addEventListener('change', async function(e) {
+document.getElementById('file-input').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file || activeSlot === null || currentIdx === null) return;
-  const name = users[currentIdx].name;
-
-  // 로컬에 먼저 표시
   const reader = new FileReader();
   reader.onload = ev => {
-    compressImage(ev.target.result, async compressed => {
-      // 로컬 저장
+    compressImage(ev.target.result, compressed => {
       const data = loadData();
+      const name = users[currentIdx].name;
       if (!data[name]) data[name] = { photos: Array(9).fill(null), submitted: false };
       data[name].photos[activeSlot] = compressed;
       saveData(data);
       renderGrid(data[name].photos);
-
-      // Supabase Storage 업로드
-      const url = await uploadToStorage(name, activeSlot, compressed);
-      if (url) {
-        // URL로 교체
-        data[name].photos[activeSlot] = url;
-        saveData(data);
-        // 제출 현황 업데이트
-        const cnt = data[name].photos.filter((p, i) => i !== 4 && p).length;
-        supaUpsert(name, data[name].submitted || false, cnt);
-      }
     });
   };
   reader.readAsDataURL(file);
   this.value = '';
-});
+});;
 
 function deletePhoto(i) {
   const data = loadData();
@@ -743,8 +604,6 @@ function submitUser() {
   ud.submitted = true;
   data[name] = ud;
   saveData(data);
-  const cnt = ud.photos.filter((p, i) => i !== 4 && p).length;
-  supaUpsert(name, true, cnt);
   document.getElementById('done-banner').style.display = 'block';
 }
 
@@ -756,7 +615,7 @@ function setFilter(f, btn) {
   renderGallery();
 }
 
-async function renderGallery() {
+function renderGallery() {
   const grid = document.getElementById('g-grid');
   grid.innerHTML = '<div class="empty">불러오는 중...</div>';
 
@@ -887,89 +746,6 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-async function openModalFromStorage(u) {
-  document.getElementById('modal-dot').style.background = u.color.hex;
-  document.getElementById('modal-name').textContent = u.name;
-  document.getElementById('modal-color-label').textContent = u.color.name;
-
-  const mgrid = document.getElementById('modal-grid');
-  mgrid.innerHTML = '<p style="grid-column:1/-1;font-size:13px;color:var(--muted);text-align:center;padding:16px;">불러오는 중...</p>';
-  document.getElementById('modal-backdrop').classList.add('open');
-  document.body.style.overflow = 'hidden';
-
-  const photos = await loadPhotosFromStorage(u.name);
-  const chipUrl = makeChipDataUrl(u);
-  viewerPhotos = photos.map((ph, i) => i === 4 ? chipUrl : ph).filter(Boolean);
-
-  mgrid.innerHTML = '';
-  photos.forEach((ph, i) => {
-    if (i === 4) {
-      const cell = document.createElement('div'); cell.className = 'modal-cell';
-      const img = document.createElement('img'); img.src = chipUrl; img.alt = '컬러칩';
-      cell.appendChild(img);
-      cell.onclick = () => openViewer(viewerPhotos.indexOf(chipUrl));
-      mgrid.appendChild(cell);
-    } else if (ph) {
-      const cell = document.createElement('div'); cell.className = 'modal-cell';
-      const img = document.createElement('img'); img.src = ph; img.alt = '';
-      cell.appendChild(img);
-      const vidx = viewerPhotos.indexOf(ph);
-      cell.onclick = () => openViewer(vidx);
-      mgrid.appendChild(cell);
-    } else {
-      const empty = document.createElement('div'); empty.className = 'modal-empty-slot';
-      const num = i < 4 ? i + 1 : i;
-      empty.innerHTML = `<span class="modal-slot-num">0${num}</span>`;
-      mgrid.appendChild(empty);
-    }
-  });
-}
-
-function openModal(u) {
-  openModalFromStorage(u);
-}
-  const data = loadData();
-  const ud = data[u.name] || { photos: Array(9).fill(null), submitted: false };
-  document.getElementById('modal-dot').style.background = u.color.hex;
-  document.getElementById('modal-name').textContent = u.name;
-  document.getElementById('modal-color-label').textContent = u.color.name;
-
-  const mgrid = document.getElementById('modal-grid');
-  mgrid.innerHTML = '';
-
-  const chipUrl = makeChipDataUrl(u);
-
-  // viewerPhotos: 9칸 순서대로, 가운데는 칩 이미지
-  viewerPhotos = ud.photos.map((ph, i) => i === 4 ? chipUrl : ph).filter(Boolean);
-  // 가운데가 항상 있으므로 인덱스 맞춤
-  const allSlots = ud.photos.map((ph, i) => i === 4 ? chipUrl : ph);
-
-  allSlots.forEach((ph, i) => {
-    if (i === 4) {
-      // 칩 슬롯
-      const cell = document.createElement('div'); cell.className = 'modal-cell';
-      const img = document.createElement('img'); img.src = chipUrl; img.alt = '컬러칩';
-      cell.appendChild(img);
-      cell.onclick = () => openViewer(viewerPhotos.indexOf(chipUrl));
-      mgrid.appendChild(cell);
-    } else if (ph) {
-      const cell = document.createElement('div'); cell.className = 'modal-cell';
-      const img = document.createElement('img'); img.src = ph; img.alt = '';
-      cell.appendChild(img);
-      const vidx = viewerPhotos.indexOf(ph);
-      cell.onclick = () => openViewer(vidx);
-      mgrid.appendChild(cell);
-    } else {
-      const empty = document.createElement('div'); empty.className = 'modal-empty-slot';
-      const num = i < 4 ? i + 1 : i;
-      empty.innerHTML = `<span class="modal-slot-num">0${num}</span>`;
-      mgrid.appendChild(empty);
-    }
-  });
-
-  document.getElementById('modal-backdrop').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
 
 function closeModal(e) {
   if (e.target === document.getElementById('modal-backdrop')) closeModalDirect();
@@ -1005,24 +781,22 @@ document.addEventListener('keydown', e => {
 });
 
 // ── ADMIN ─────────────────────────────────
-async function resetAll() {
+function resetAll() {
   if (!confirm('전체 참가자의 제출 현황을 모두 초기화할까요?\n이 작업은 되돌릴 수 없어요.')) return;
   localStorage.removeItem(STORAGE_KEY);
-  await supaReset();
   renderAdmin();
   alert('✓ 전체 초기화 완료!');
 }
 
-async function resetOne(name) {
+function resetOne(name) {
   if (!confirm(`${name} 님의 데이터를 초기화할까요?`)) return;
   const data = loadData();
   delete data[name];
   saveData(data);
-  await supaResetOne(name);
   renderAdmin();
 }
 
-async function renderAdmin() {
+function renderAdmin() {
   const list = document.getElementById('admin-list');
   list.innerHTML = '<p style="font-size:13px;color:var(--muted);padding:12px 0;">불러오는 중...</p>';
 
